@@ -21,6 +21,7 @@ Office Tools 是一个强大的 Office 文档批量处理工具集，专为 Clau
 ## 核心功能
 
 - ✅ 批量替换关键词
+- ✅ 文件列表预览（处理前先显示所有文件，防止遗漏）
 - ✅ 格式保留
 - ✅ 自动转换
 - ✅ 递归处理
@@ -52,6 +53,7 @@ python scripts/replace_tool.py <路径> --replace "旧=新" [选项]
 - `--recursive` - 递归处理
 - `--dry-run` - 预览模式
 - `--no-backup` - 不创建备份
+- `--no-list` - 不显示文件列表（默认会先显示所有将要处理的文件）
 
 ### 环境检查：scripts/check_env.py
 
