@@ -1,0 +1,33 @@
+#!/bin/bash
+# 关键词替换工具快速启动脚本
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOL_PATH="$SCRIPT_DIR/replace_keywords.py"
+
+# 检查环境
+if [ "$1" = "--check-env" ] || [ "$1" = "-c" ]; then
+    python3 "$SCRIPT_DIR/check_env.py"
+    exit $?
+fi
+
+# 显示帮助
+if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "关键词替换工具 - 快速启动脚本"
+    echo ""
+    echo "用法: replace [选项] <路径> --replace <规则>"
+    echo ""
+    echo "选项:"
+    echo "  --check-env, -c    检查运行环境"
+    echo "  --help, -h         显示帮助"
+    echo ""
+    echo "示例:"
+    echo "  replace file.docx --replace \"旧=新\""
+    echo "  replace ./docs --replace \"旧=新\" --recursive"
+    echo "  replace file.xlsx --replace \"旧=新\" --dry-run"
+    echo ""
+    echo "完整帮助: uv run python $TOOL_PATH --help"
+    exit 0
+fi
+
+# 运行工具
+uv run python "$TOOL_PATH" "$@"
