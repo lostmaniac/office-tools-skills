@@ -58,7 +58,7 @@ class KeywordReplacer:
 
     def replace_in_docx(self, file_path: str, replacements: Dict[str, str]) -> int:
         """
-        在 docx 文件中替换关键词
+        在 docx 文件中替换关键词（支持跨 run 替换）
 
         Args:
             file_path: 文件路径
@@ -71,26 +71,20 @@ class KeywordReplacer:
             doc = Document(file_path)
             count = 0
 
-            # 替换段落中的文本
+            # 替换段落中的文本（支持跨 run）
             for paragraph in doc.paragraphs:
                 for old, new in replacements.items():
                     if old in paragraph.text:
-                        for run in paragraph.runs:
-                            if old in run.text:
-                                run.text = run.text.replace(old, new)
-                                count += 1
+                        count += self._replace_in_paragraph(paragraph, old, new)
 
-            # 替换表格中的文本
+            # 替换表格中的文本（支持跨 run）
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
                         for paragraph in cell.paragraphs:
                             for old, new in replacements.items():
                                 if old in paragraph.text:
-                                    for run in paragraph.runs:
-                                        if old in run.text:
-                                            run.text = run.text.replace(old, new)
-                                            count += 1
+                                    count += self._replace_in_paragraph(paragraph, old, new)
 
             # 保存文件
             if not self.dry_run and count > 0:
@@ -105,6 +99,75 @@ class KeywordReplacer:
         except Exception as e:
             print(f"  ✗ 处理 docx 失败: {e}")
             return 0
+
+    def _replace_in_paragraph(self, paragraph, old_text: str, new_text: str) -> int:
+        """
+        在段落中替换文本（支持跨 run）
+
+        Args:
+            paragraph: 段落对象
+            old_text: 旧文本
+            new_text: 新文本
+
+        Returns:
+            替换次数
+        """
+        # 构建完整文本并查找位置
+        full_text = paragraph.text
+        if old_text not in full_text:
+            return 0
+
+        count = 0
+        start_pos = 0
+        while True:
+            # 查找关键词位置
+            pos = full_text.find(old_text, start_pos)
+            if pos == -1:
+                break
+
+            # 找到关键词在哪些 run 中
+            char_count = 0
+            start_run_idx = None
+            end_run_idx = None
+            start_offset = 0
+            end_offset = 0
+
+            for run_idx, run in enumerate(paragraph.runs):
+                run_len = len(run.text)
+                if char_count <= pos < char_count + run_len:
+                    start_run_idx = run_idx
+                    start_offset = pos - char_count
+                if char_count <= pos + len(old_text) <= char_count + run_len:
+                    end_run_idx = run_idx
+                    end_offset = pos + len(old_text) - char_count
+                    break
+                char_count += run_len
+
+            if start_run_idx is not None and end_run_idx is not None:
+                # 执行替换
+                if start_run_idx == end_run_idx:
+                    # 关键词在同一个 run 中
+                    run_text = paragraph.runs[start_run_idx].text
+                    paragraph.runs[start_run_idx].text = run_text[:start_offset] + new_text + run_text[end_offset:]
+                else:
+                    # 关键词跨越多个 run
+                    # 修改第一个 run
+                    first_run = paragraph.runs[start_run_idx]
+                    first_run.text = first_run.text[:start_offset] + new_text
+
+                    # 清空中间的 run
+                    for i in range(start_run_idx + 1, end_run_idx + 1):
+                        if i < end_run_idx:
+                            paragraph.runs[i].text = ''
+                        else:
+                            paragraph.runs[i].text = paragraph.runs[i].text[end_offset:]
+
+                count += 1
+                start_pos = pos + len(new_text)
+            else:
+                break
+
+        return count
 
     def replace_in_xlsx(self, file_path: str, replacements: Dict[str, str]) -> int:
         """
