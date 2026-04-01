@@ -402,12 +402,77 @@ class KeywordReplacer:
 
         return count
 
+    def list_directory_files(
+        self,
+        directory: str,
+        pattern: str = "*",
+        recursive: bool = False
+    ) -> List[Path]:
+        """
+        列出目录中的所有 Office 文件
+
+        Args:
+            directory: 目录路径
+            pattern: 文件匹配模式
+            recursive: 是否递归处理子目录
+
+        Returns:
+            文件路径列表
+        """
+        path = Path(directory)
+        glob_method = path.rglob if recursive else path.glob
+        extensions = ['.docx', '.xlsx', '.doc', '.xls']
+
+        files = []
+        for file_path in glob_method(pattern):
+            if file_path.suffix.lower() in extensions:
+                files.append(file_path)
+
+        return files
+
+    def print_file_list(self, files: List[Path], directory: str) -> None:
+        """
+        打印文件列表
+
+        Args:
+            files: 文件路径列表
+            directory: 基础目录路径
+        """
+        print("\n" + "=" * 70)
+        print("📋 找到的 Office 文件")
+        print("=" * 70)
+
+        if not files:
+            print("⚠ 未找到任何 Office 文件")
+            return
+
+        # 按目录分组
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        base_path = Path(directory).absolute()
+
+        for file_path in files:
+            rel_path = file_path.relative_to(base_path)
+            parent = rel_path.parent
+            grouped[str(parent)].append(rel_path.name)
+
+        # 打印分组文件
+        for dir_name in sorted(grouped.keys()):
+            print(f"\n📁 {dir_name if dir_name != '.' else '根目录'}")
+            for filename in sorted(grouped[dir_name]):
+                print(f"   • {filename}")
+
+        print("\n" + "=" * 70)
+        print(f"总计: {len(files)} 个文件")
+        print("=" * 70)
+
     def replace_in_directory(
         self,
         directory: str,
         replacements: Dict[str, str],
         pattern: str = "*",
-        recursive: bool = False
+        recursive: bool = False,
+        list_first: bool = True
     ) -> None:
         """
         批量处理目录中的文件
@@ -417,15 +482,22 @@ class KeywordReplacer:
             replacements: 替换字典
             pattern: 文件匹配模式
             recursive: 是否递归处理子目录
+            list_first: 是否先列出文件
         """
-        path = Path(directory)
-        glob_method = path.rglob if recursive else path.glob
+        # 先列出所有文件
+        files = self.list_directory_files(directory, pattern, recursive)
 
-        extensions = ['.docx', '.xlsx', '.doc', '.xls']
+        if list_first:
+            self.print_file_list(files, directory)
 
-        for file_path in glob_method(pattern):
-            if file_path.suffix.lower() in extensions:
-                self.replace_in_file(str(file_path), replacements)
+            if not self.dry_run:
+                import time
+                print("\n⏳ 即将开始处理文件...")
+                time.sleep(0.5)  # 给用户时间查看文件列表
+
+        # 处理文件
+        for file_path in files:
+            self.replace_in_file(str(file_path), replacements)
 
     def print_summary(self):
         """打印统计摘要"""
@@ -476,6 +548,8 @@ def main():
                        help='不创建备份文件')
     parser.add_argument('--no-convert', action='store_true',
                        help='不自动转换旧格式文件（.doc, .xls）')
+    parser.add_argument('--no-list', action='store_true',
+                       help='处理前不列出文件（默认会先列出所有文件）')
 
     args = parser.parse_args()
 
@@ -508,7 +582,8 @@ def main():
         replacer.replace_in_directory(
             args.path,
             replacements,
-            recursive=args.recursive
+            recursive=args.recursive,
+            list_first=not args.no_list
         )
     else:
         print(f"✗ 路径不存在: {args.path}")
